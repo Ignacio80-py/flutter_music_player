@@ -1,0 +1,35 @@
+# Miscellaneous
+*.class
+*.log
+*.pyc
+*.swp
+*.DS_Store
+*.atom/
+*.buildlog/
+*.history
+*.iml
+*.idea
+
+# Flutter/Dart/Pub related
+.dart_tool/
+.packages
+.pub-cache/
+build/
+
+# Generated plugin registrant files
+lib/generated_plugin_registrant.dart
+
+# IDE specific files
+.idea/
+*.iml
+
+# Windows
+/windows/flutter/ephemeral
+/windows/flutter/generated_config.cmake
+
+# Linux
+/linux/flutter/ephemeral
+/linux/flutter/generated_config.cmake
+
+# macOS
+/macos/Flutter/ephemeral
