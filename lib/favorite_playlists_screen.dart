@@ -33,12 +33,39 @@ class _FavoritePlaylistsScreenState extends State<FavoritePlaylistsScreen> {
     final prefs = await SharedPreferences.getInstance();
     final String? playlistsString = prefs.getString('playlists');
     if (playlistsString != null) {
-      final Map<String, dynamic> playlistsJson = jsonDecode(playlistsString);
-      setState(() {
-        _playlists = playlistsJson.map((key, value) {
-          return MapEntry(key, List<String>.from(value));
+      try {
+        final Map<String, dynamic> playlistsJson = jsonDecode(playlistsString);
+        final Map<String, List<String>> cleanedPlaylists = {};
+        bool needsSave = false;
+
+        playlistsJson.forEach((key, value) {
+          final List<String> songPaths = List<String>.from(value);
+          final List<String> existingSongPaths = [];
+          for (final path in songPaths) {
+            if (File(path).existsSync()) {
+              existingSongPaths.add(path);
+            } else {
+              needsSave = true;
+            }
+          }
+          cleanedPlaylists[key] = existingSongPaths;
         });
-      });
+
+        setState(() {
+          _playlists = cleanedPlaylists;
+        });
+
+        if (needsSave) {
+          await _savePlaylists();
+        }
+
+      } on FormatException {
+        // If the data is corrupted, reset the playlists
+        setState(() {
+          _playlists = {};
+        });
+        await _savePlaylists();
+      }
     }
   }
 
@@ -54,7 +81,7 @@ class _FavoritePlaylistsScreenState extends State<FavoritePlaylistsScreen> {
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: const Text('Creae Nueva Lista'),
+          title: const Text('Crear Nueva Lista'),
           content: TextField(
             controller: _playlistNameController,
             decoration: const InputDecoration(hintText: "Nombre Lista"),
@@ -117,7 +144,7 @@ class _FavoritePlaylistsScreenState extends State<FavoritePlaylistsScreen> {
       builder: (BuildContext context) {
         return AlertDialog(
           title: const Text('Eliminar Lista'),
-          content: Text('Esta seguro de eliminar la lista"$playlistName"?'),
+          content: Text('Esta seguro de eliminar la lista "$playlistName"?'),
           actions: <Widget>[
             TextButton(
               child: const Text(

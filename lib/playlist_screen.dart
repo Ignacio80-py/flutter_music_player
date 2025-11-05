@@ -3,11 +3,13 @@ import 'package:flutter/material.dart';
 
 class PlaylistScreen extends StatefulWidget {
   final List<File> audioFiles;
+  final List<File> originalAudioFiles;
   final int currentTrackIndex;
 
   const PlaylistScreen({
     super.key,
     required this.audioFiles,
+    required this.originalAudioFiles,
     required this.currentTrackIndex,
   });
 
@@ -17,18 +19,21 @@ class PlaylistScreen extends StatefulWidget {
 
 class _PlaylistScreenState extends State<PlaylistScreen> {
   late List<File> _audioFiles;
+  late List<File> _originalAudioFiles;
   late int _currentTrackIndex;
 
   @override
   void initState() {
     super.initState();
     _audioFiles = List.from(widget.audioFiles);
+    _originalAudioFiles = List.from(widget.originalAudioFiles);
     _currentTrackIndex = widget.currentTrackIndex;
   }
 
   void _deleteTrack(int index) {
     setState(() {
-      _audioFiles.removeAt(index);
+      final removedFile = _audioFiles.removeAt(index);
+      _originalAudioFiles.remove(removedFile);
 
       // Ajustar el índice de la canción actual
       if (index < _currentTrackIndex) {
@@ -74,6 +79,7 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
                 Navigator.pop(context, {
                   'index': _currentTrackIndex,
                   'files': _audioFiles,
+                  'originalFiles': _originalAudioFiles,
                 });
               },
               child: ListView.builder(
@@ -102,6 +108,7 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
                       Navigator.pop(context, {
                         'index': index,
                         'files': _audioFiles,
+                        'originalFiles': _originalAudioFiles,
                       });
                     },
                     trailing: IconButton(

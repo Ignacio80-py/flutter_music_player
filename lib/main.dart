@@ -39,6 +39,7 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen> {
   List<File> _originalAudioFiles = [];
   int _currentTrackIndex = 0;
   bool _isPlaying = false;
+  bool _isLoading = false;
   bool _isShuffle = false;
   RepeatState _repeatState = RepeatState.off;
   Duration _duration = Duration.zero;
@@ -127,46 +128,59 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen> {
   }
 
   Future<void> _play() async {
-    if (_audioFiles.isNotEmpty && _currentTrackIndex >= 0 && _currentTrackIndex < _audioFiles.length) {
-      try {
-        await _audioPlayer.play(audioplayers.DeviceFileSource(_audioFiles[_currentTrackIndex].path));
-      } catch (e) {
-        if (!mounted) return;
-        final String fileName = _audioFiles[_currentTrackIndex].path.split(Platform.pathSeparator).last;
+    if (_isLoading) return;
 
-        // Remove the song first
-        final removedFile = _audioFiles.removeAt(_currentTrackIndex);
-        _originalAudioFiles.remove(removedFile);
+    if (mounted) {
+      setState(() {
+        _isLoading = true;
+      });
+    }
 
-        // Show feedback
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: "$fileName" not found. Removing from playlist.'),
-            backgroundColor: Colors.red,
-          ),
+    try {
+      if (_audioFiles.isNotEmpty &&
+          _currentTrackIndex >= 0 &&
+          _currentTrackIndex < _audioFiles.length) {
+        await _audioPlayer.play(
+          audioplayers.DeviceFileSource(_audioFiles[_currentTrackIndex].path),
         );
-
-        // Now, decide what to do next
-        if (_audioFiles.isEmpty) {
-          // No songs left
-          setState(() {
+      }
+    } catch (e) {
+      if (!mounted) return;
+      final String fileName = _audioFiles[_currentTrackIndex].path.split(Platform.pathSeparator).last;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+              'Error al reproducir "$fileName": $e. Eliminando...'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      if (mounted) {
+        setState(() {
+          final File removedFile = _audioFiles[_currentTrackIndex];
+          _audioFiles.removeAt(_currentTrackIndex);
+          _originalAudioFiles.remove(removedFile);
+          if (_audioFiles.isEmpty) {
             _isPlaying = false;
             _duration = Duration.zero;
             _position = Duration.zero;
-            _currentTrackIndex = 0;
-          });
-        } else {
-          // Play next song
-          if (_currentTrackIndex >= _audioFiles.length) {
-            _currentTrackIndex = 0; // Loop back to the start
+          } else {
+            if (_currentTrackIndex >= _audioFiles.length) {
+              _currentTrackIndex = 0;
+            }
+            // No llames a _play() aquí directamente para evitar recursión infinita en caso de errores consecutivos
           }
-          // We need to trigger a rebuild for the UI to update the song name
-          setState(() {});
-          _play(); // Play the next available song
-        }
-        
-        // Persist the cleaned playlist
-        await _saveCurrentPlaylistState();
+        });
+      }
+      _saveCurrentPlaylistState();
+      // Llama a _playNext() para intentar con la siguiente canción si la lista no está vacía
+      if (_audioFiles.isNotEmpty) {
+        _playNext();
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
       }
     }
   }
@@ -176,7 +190,7 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen> {
   }
 
   void _playNext() {
-    if (_audioFiles.isEmpty) return;
+    if (_audioFiles.isEmpty || _isLoading) return;
 
     setState(() {
       if (_isShuffle && _audioFiles.length > 1) {
@@ -193,7 +207,7 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen> {
   }
 
   void _playPrevious() {
-    if (_audioFiles.isEmpty) return;
+    if (_audioFiles.isEmpty || _isLoading) return;
 
     setState(() {
       if (_isShuffle && _audioFiles.length > 1) {
@@ -203,7 +217,8 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen> {
         } while (newIndex == _currentTrackIndex);
         _currentTrackIndex = newIndex;
       } else {
-        _currentTrackIndex = (_currentTrackIndex - 1 + _audioFiles.length) % _audioFiles.length;
+        _currentTrackIndex =
+            (_currentTrackIndex - 1 + _audioFiles.length) % _audioFiles.length;
       }
     });
     _play();
@@ -212,17 +227,18 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen> {
   void _toggleShuffle() {
     setState(() {
       _isShuffle = !_isShuffle;
-      
+
       if (_isShuffle) {
         // Guardar la canción que está sonando actualmente
         File? currentSong;
-        if (_currentTrackIndex >= 0 && _currentTrackIndex < _audioFiles.length) {
+        if (_currentTrackIndex >= 0 &&
+            _currentTrackIndex < _audioFiles.length) {
           currentSong = _audioFiles[_currentTrackIndex];
         }
-        
+
         // Mezclar la lista
         _audioFiles.shuffle();
-        
+
         // Encontrar el nuevo índice de la canción actual
         if (currentSong != null) {
           _currentTrackIndex = _audioFiles.indexOf(currentSong);
@@ -230,17 +246,19 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen> {
           if (_currentTrackIndex == -1) {
             _currentTrackIndex = 0;
           }
+        } else {
+          _currentTrackIndex = 0;
         }
-      }
-      else {
+      } else {
         // Volver a la lista original
         File? currentSong;
-        if (_currentTrackIndex >= 0 && _currentTrackIndex < _audioFiles.length) {
+        if (_currentTrackIndex >= 0 &&
+            _currentTrackIndex < _audioFiles.length) {
           currentSong = _audioFiles[_currentTrackIndex];
         }
-        
+
         _audioFiles = List.from(_originalAudioFiles);
-        
+
         // Encontrar el índice de la canción actual en la lista original
         if (currentSong != null) {
           _currentTrackIndex = _audioFiles.indexOf(currentSong);
@@ -291,6 +309,7 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen> {
       MaterialPageRoute(
         builder: (context) => PlaylistScreen(
           audioFiles: _audioFiles,
+          originalAudioFiles: _originalAudioFiles,
           currentTrackIndex: _currentTrackIndex,
         ),
       ),
@@ -299,16 +318,17 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen> {
     if (result != null && result is Map) {
       final int newIndex = result['index'];
       final List<File> newFiles = result['files'];
+      final List<File> newOriginalFiles = result['originalFiles'];
 
       // Verificar que el índice sea válido
       if (newIndex < 0 || newIndex >= newFiles.length) {
         // Si el índice no es válido, ajustarlo
         setState(() {
           _audioFiles = newFiles;
-          _originalAudioFiles = List.from(newFiles);
-          
+          _originalAudioFiles = newOriginalFiles;
+
           if (newFiles.isEmpty) {
-            _currentTrackIndex = -1;
+            _currentTrackIndex = 0;
             _isPlaying = false;
             _duration = Duration.zero;
             _position = Duration.zero;
@@ -323,9 +343,9 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen> {
       } else {
         setState(() {
           _audioFiles = newFiles;
-          _originalAudioFiles = List.from(newFiles);
+          _originalAudioFiles = newOriginalFiles;
           _currentTrackIndex = newIndex;
-          
+
           if (_isShuffle && _audioFiles.isNotEmpty) {
             File currentSong = _audioFiles[_currentTrackIndex];
             _audioFiles.shuffle();
@@ -368,7 +388,8 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen> {
         if (mounted) {
           setState(() {
             if (_sleepTimerRemaining.inSeconds > 0) {
-              _sleepTimerRemaining = _sleepTimerRemaining - const Duration(seconds: 1);
+              _sleepTimerRemaining =
+                  _sleepTimerRemaining - const Duration(seconds: 1);
             } else {
               _countdownTimer?.cancel();
             }
@@ -389,7 +410,9 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen> {
 
   Future<void> _saveCurrentPlaylistState() async {
     final prefs = await SharedPreferences.getInstance();
-    final List<String> audioFilePaths = _originalAudioFiles.map((file) => file.path).toList();
+    final List<String> audioFilePaths = _originalAudioFiles
+        .map((file) => file.path)
+        .toList();
     await prefs.setStringList('currentAudioFiles', audioFilePaths);
     await prefs.setInt('currentTrackIndex', _currentTrackIndex);
     await prefs.setBool('isShuffle', _isShuffle);
@@ -398,19 +421,48 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen> {
 
   Future<void> _loadCurrentPlaylistState() async {
     final prefs = await SharedPreferences.getInstance();
-    final List<String>? audioFilePaths = prefs.getStringList('currentAudioFiles');
+    final List<String>? audioFilePaths = prefs.getStringList(
+      'currentAudioFiles',
+    );
     if (audioFilePaths != null && audioFilePaths.isNotEmpty) {
+      final List<File> validFiles = [];
+      final audioplayers.AudioPlayer validator = audioplayers.AudioPlayer();
+
+      for (final path in audioFilePaths) {
+        final file = File(path);
+        if (await file.exists()) {
+          try {
+            await validator.setSource(audioplayers.DeviceFileSource(file.path));
+            validFiles.add(file);
+          } catch (e) {
+            debugPrint('Skipping corrupt file: ${file.path}');
+          }
+        }
+      }
+      validator.dispose();
+
+      if (validFiles.length != audioFilePaths.length) {
+        // If some files were removed, save the cleaned list
+        await prefs.setStringList('currentAudioFiles', validFiles.map((f) => f.path).toList());
+      }
+
       setState(() {
-        _originalAudioFiles = audioFilePaths.map((path) => File(path)).toList();
+        _originalAudioFiles = validFiles;
         _audioFiles = List.from(_originalAudioFiles);
         _currentTrackIndex = prefs.getInt('currentTrackIndex') ?? 0;
         _isShuffle = prefs.getBool('isShuffle') ?? false;
         _repeatState = RepeatState.values[prefs.getInt('repeatState') ?? 0];
 
+        if (_currentTrackIndex < 0 || _currentTrackIndex >= _audioFiles.length) {
+          _currentTrackIndex = 0;
+        }
+
         if (_isShuffle) {
           _audioFiles.shuffle();
           // Ensure current track index is valid after shuffle
-          if (_originalAudioFiles.isNotEmpty && _currentTrackIndex >= 0 && _currentTrackIndex < _originalAudioFiles.length) {
+          if (_originalAudioFiles.isNotEmpty &&
+              _currentTrackIndex >= 0 &&
+              _currentTrackIndex < _originalAudioFiles.length) {
             File currentSong = _originalAudioFiles[_currentTrackIndex];
             _currentTrackIndex = _audioFiles.indexOf(currentSong);
             if (_currentTrackIndex == -1) {
@@ -428,8 +480,12 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen> {
   }
 
   Future<void> _preparePlayer() async {
-    if (_audioFiles.isNotEmpty && _currentTrackIndex >= 0 && _currentTrackIndex < _audioFiles.length) {
-      await _audioPlayer.setSource(audioplayers.DeviceFileSource(_audioFiles[_currentTrackIndex].path));
+    if (_audioFiles.isNotEmpty &&
+        _currentTrackIndex >= 0 &&
+        _currentTrackIndex < _audioFiles.length) {
+      await _audioPlayer.setSource(
+        audioplayers.DeviceFileSource(_audioFiles[_currentTrackIndex].path),
+      );
     }
   }
 
@@ -438,28 +494,28 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen> {
       context: context,
       builder: (BuildContext context) {
         return SimpleDialog(
-          title: const Text('Sleep Timer'),
+          title: const Text('Temporizador de Apagado'),
           children: <Widget>[
             SimpleDialogOption(
               onPressed: () {
                 _startSleepTimer(15);
                 Navigator.pop(context);
               },
-              child: const Text('15 minutes'),
+              child: const Text('15 minutos'),
             ),
             SimpleDialogOption(
               onPressed: () {
                 _startSleepTimer(30);
                 Navigator.pop(context);
               },
-              child: const Text('30 minutes'),
+              child: const Text('30 minutos'),
             ),
             SimpleDialogOption(
               onPressed: () {
                 _startSleepTimer(60);
                 Navigator.pop(context);
               },
-              child: const Text('60 minutes'),
+              child: const Text('60 minutos'),
             ),
             if (_sleepTimer != null && _sleepTimer!.isActive)
               SimpleDialogOption(
@@ -467,7 +523,10 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen> {
                   _cancelSleepTimer();
                   Navigator.pop(context);
                 },
-                child: const Text('Cancel Timer', style: TextStyle(color: Colors.red)),
+                child: const Text(
+                  'Cancelar Temporizador',
+                  style: TextStyle(color: Colors.red),
+                ),
               ),
           ],
         );
@@ -511,10 +570,7 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen> {
         child: Column(
           children: [
             IconButton(
-              icon: const Icon(
-                Icons.folder_open,
-                color: Colors.red,
-              ),
+              icon: const Icon(Icons.folder_open, color: Colors.red),
               iconSize: 80,
               onPressed: _pickFiles,
             ),
@@ -522,9 +578,13 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen> {
             GestureDetector(
               onTap: _audioFiles.isNotEmpty ? _openPlaylist : null,
               child: Text(
-                _audioFiles.isNotEmpty && _currentTrackIndex >= 0 && _currentTrackIndex < _audioFiles.length
-                    ? _audioFiles[_currentTrackIndex].path.split(Platform.pathSeparator).last
-                    : 'No track selected',
+                _audioFiles.isNotEmpty &&
+                        _currentTrackIndex >= 0 &&
+                        _currentTrackIndex < _audioFiles.length
+                    ? _audioFiles[_currentTrackIndex].path
+                          .split(Platform.pathSeparator)
+                          .last
+                    : 'Ninguna canción seleccionada',
                 style: const TextStyle(color: Colors.white, fontSize: 18),
                 textAlign: TextAlign.center,
               ),
@@ -538,19 +598,24 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen> {
                     IconButton(
                       icon: const Icon(Icons.skip_previous, color: Colors.red),
                       iconSize: 40,
-                      onPressed: _audioFiles.isNotEmpty ? _playPrevious : null,
+                      onPressed: _audioFiles.isNotEmpty && !_isLoading ? _playPrevious : null,
                     ),
                     const SizedBox(width: 20),
                     IconButton(
-                      icon: Icon(_isPlaying ? Icons.pause : Icons.play_arrow, color: Colors.red),
+                      icon: Icon(
+                        _isPlaying ? Icons.pause : Icons.play_arrow,
+                        color: Colors.red,
+                      ),
                       iconSize: 40,
-                      onPressed: _audioFiles.isNotEmpty ? (_isPlaying ? _pause : _play) : null,
+                      onPressed: _audioFiles.isNotEmpty && !_isLoading
+                          ? (_isPlaying ? _pause : _play)
+                          : null,
                     ),
                     const SizedBox(width: 20),
                     IconButton(
                       icon: const Icon(Icons.skip_next, color: Colors.red),
                       iconSize: 40,
-                      onPressed: _audioFiles.isNotEmpty ? _playNext : null,
+                      onPressed: _audioFiles.isNotEmpty && !_isLoading ? _playNext : null,
                     ),
                   ],
                 ),
@@ -559,12 +624,18 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen> {
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
                     IconButton(
-                      icon: Icon(Icons.shuffle, color: _isShuffle ? Colors.green : Colors.red),
+                      icon: Icon(
+                        Icons.shuffle,
+                        color: _isShuffle ? Colors.green : Colors.red,
+                      ),
                       iconSize: 40,
                       onPressed: _audioFiles.isNotEmpty ? _toggleShuffle : null,
                     ),
                     IconButton(
-                      icon: Icon(_getRepeatIcon(), color: _getRepeatIconColor()),
+                      icon: Icon(
+                        _getRepeatIcon(),
+                        color: _getRepeatIconColor(),
+                      ),
                       iconSize: 40,
                       onPressed: _audioFiles.isNotEmpty ? _toggleRepeat : null,
                     ),
@@ -578,7 +649,10 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen> {
                 Slider(
                   min: 0,
                   max: _duration.inSeconds.toDouble(),
-                  value: _position.inSeconds.toDouble().clamp(0.0, _duration.inSeconds.toDouble()),
+                  value: _position.inSeconds.toDouble().clamp(
+                    0.0,
+                    _duration.inSeconds.toDouble(),
+                  ),
                   onChanged: _audioFiles.isNotEmpty
                       ? (value) async {
                           final position = Duration(seconds: value.toInt());
@@ -591,8 +665,14 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(_formatDuration(_position), style: const TextStyle(color: Colors.white)),
-                    Text(_formatDuration(_duration - _position), style: const TextStyle(color: Colors.white)),
+                    Text(
+                      _formatDuration(_position),
+                      style: const TextStyle(color: Colors.white),
+                    ),
+                    Text(
+                      _formatDuration(_duration - _position),
+                      style: const TextStyle(color: Colors.white),
+                    ),
                   ],
                 ),
               ],
@@ -604,14 +684,22 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen> {
                 Row(
                   children: [
                     IconButton(
-                      icon: Icon(Icons.timer, color: _sleepTimer != null && _sleepTimer!.isActive ? Colors.green : Colors.red),
+                      icon: Icon(
+                        Icons.timer,
+                        color: _sleepTimer != null && _sleepTimer!.isActive
+                            ? Colors.green
+                            : Colors.red,
+                      ),
                       iconSize: 40,
                       onPressed: _showTimerDialog,
                     ),
                     if (_sleepTimer != null && _sleepTimer!.isActive)
                       Text(
                         _formatDuration(_sleepTimerRemaining),
-                        style: const TextStyle(color: Colors.green, fontSize: 16),
+                        style: const TextStyle(
+                          color: Colors.green,
+                          fontSize: 16,
+                        ),
                       ),
                   ],
                 ),

@@ -45,12 +45,18 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
     try {
       final prefs = await SharedPreferences.getInstance();
       final String? playlistsString = prefs.getString('playlists');
+      Map<String, dynamic> playlistsJson = {};
       if (playlistsString != null) {
-        final Map<String, dynamic> playlistsJson = jsonDecode(playlistsString);
-        playlistsJson[widget.playlistName] = _playlistSongs;
-        final String updatedPlaylistsString = jsonEncode(playlistsJson);
-        await prefs.setString('playlists', updatedPlaylistsString);
+        try {
+          playlistsJson = jsonDecode(playlistsString);
+        } on FormatException {
+          // If the data is corrupted, we will overwrite it with a new valid structure
+          playlistsJson = {};
+        }
       }
+      playlistsJson[widget.playlistName] = _playlistSongs;
+      final String updatedPlaylistsString = jsonEncode(playlistsJson);
+      await prefs.setString('playlists', updatedPlaylistsString);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
