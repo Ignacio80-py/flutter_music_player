@@ -33,9 +33,9 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
   void _cleanInvalidSongs() {
     final validPaths = widget.allSongs.map((f) => f.path).toSet();
     final originalLength = _playlistSongs.length;
-    
+
     _playlistSongs.removeWhere((songPath) => !validPaths.contains(songPath));
-    
+
     if (_playlistSongs.length != originalLength) {
       _savePlaylist();
     }
@@ -91,7 +91,7 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Todas las canciones ya están en la playlist'),
-          backgroundColor: Colors.orange,
+          backgroundColor: Colors.red,
         ),
       );
       return;
@@ -143,7 +143,10 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
                     style: const TextStyle(color: Colors.white),
                   ),
                   trailing: IconButton(
-                    icon: const Icon(Icons.remove_circle_outline, color: Colors.red),
+                    icon: const Icon(
+                      Icons.remove_circle_outline,
+                      color: Colors.red,
+                    ),
                     onPressed: () => _removeSong(index),
                   ),
                 );
@@ -184,7 +187,10 @@ class __AddSongsDialogState extends State<_AddSongsDialog> {
   Widget build(BuildContext context) {
     return AlertDialog(
       backgroundColor: Colors.grey[900],
-      title: const Text('Añadir Canciones', style: TextStyle(color: Colors.red)),
+      title: const Text(
+        'Añadir Canciones',
+        style: TextStyle(color: Colors.red),
+      ),
       content: SizedBox(
         width: double.maxFinite,
         child: widget.songsToAdd.isEmpty

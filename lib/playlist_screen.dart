@@ -29,7 +29,7 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
   void _deleteTrack(int index) {
     setState(() {
       _audioFiles.removeAt(index);
-      
+
       // Ajustar el índice de la canción actual
       if (index < _currentTrackIndex) {
         // Si eliminamos una canción antes de la actual, decrementar el índice
@@ -53,7 +53,7 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Playlist', style: TextStyle(color: Colors.red)),
+        title: const Text('Listas', style: TextStyle(color: Colors.red)),
         backgroundColor: Colors.black,
         iconTheme: const IconThemeData(color: Colors.red),
       ),
@@ -61,7 +61,7 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
       body: _audioFiles.isEmpty
           ? const Center(
               child: Text(
-                'Playlist vacía',
+                'Lista vacía',
                 style: TextStyle(color: Colors.white, fontSize: 18),
               ),
             )
@@ -82,10 +82,14 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
                   final isPlaying = index == _currentTrackIndex;
                   return ListTile(
                     title: Text(
-                      _audioFiles[index].path.split(Platform.pathSeparator).last,
+                      _audioFiles[index].path
+                          .split(Platform.pathSeparator)
+                          .last,
                       style: TextStyle(
                         color: isPlaying ? Colors.green : Colors.white,
-                        fontWeight: isPlaying ? FontWeight.bold : FontWeight.normal,
+                        fontWeight: isPlaying
+                            ? FontWeight.bold
+                            : FontWeight.normal,
                       ),
                     ),
                     leading: isPlaying

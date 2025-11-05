@@ -128,7 +128,46 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen> {
 
   Future<void> _play() async {
     if (_audioFiles.isNotEmpty && _currentTrackIndex >= 0 && _currentTrackIndex < _audioFiles.length) {
-      await _audioPlayer.play(audioplayers.DeviceFileSource(_audioFiles[_currentTrackIndex].path));
+      try {
+        await _audioPlayer.play(audioplayers.DeviceFileSource(_audioFiles[_currentTrackIndex].path));
+      } catch (e) {
+        if (!mounted) return;
+        final String fileName = _audioFiles[_currentTrackIndex].path.split(Platform.pathSeparator).last;
+
+        // Remove the song first
+        final removedFile = _audioFiles.removeAt(_currentTrackIndex);
+        _originalAudioFiles.remove(removedFile);
+
+        // Show feedback
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: "$fileName" not found. Removing from playlist.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+
+        // Now, decide what to do next
+        if (_audioFiles.isEmpty) {
+          // No songs left
+          setState(() {
+            _isPlaying = false;
+            _duration = Duration.zero;
+            _position = Duration.zero;
+            _currentTrackIndex = 0;
+          });
+        } else {
+          // Play next song
+          if (_currentTrackIndex >= _audioFiles.length) {
+            _currentTrackIndex = 0; // Loop back to the start
+          }
+          // We need to trigger a rebuild for the UI to update the song name
+          setState(() {});
+          _play(); // Play the next available song
+        }
+        
+        // Persist the cleaned playlist
+        await _saveCurrentPlaylistState();
+      }
     }
   }
 
@@ -138,22 +177,15 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen> {
 
   void _playNext() {
     if (_audioFiles.isEmpty) return;
-    
+
     setState(() {
-      if (_isShuffle) {
-        // En modo shuffle, elegir una canción aleatoria diferente a la actual
-        if (_audioFiles.length > 1) {
-          int newIndex;
-          do {
-            newIndex = Random().nextInt(_audioFiles.length);
-          } while (newIndex == _currentTrackIndex);
-          _currentTrackIndex = newIndex;
-        } else {
-          // Si solo hay una canción, simplemente la reproduce (o no hace nada si ya está sonando)
-          _currentTrackIndex = 0;
-        }
-      }
-      else {
+      if (_isShuffle && _audioFiles.length > 1) {
+        int newIndex;
+        do {
+          newIndex = Random().nextInt(_audioFiles.length);
+        } while (newIndex == _currentTrackIndex);
+        _currentTrackIndex = newIndex;
+      } else {
         _currentTrackIndex = (_currentTrackIndex + 1) % _audioFiles.length;
       }
     });
@@ -162,22 +194,15 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen> {
 
   void _playPrevious() {
     if (_audioFiles.isEmpty) return;
-    
+
     setState(() {
-      if (_isShuffle) {
-        // En modo shuffle, elegir una canción aleatoria diferente a la actual
-        if (_audioFiles.length > 1) {
-          int newIndex;
-          do {
-            newIndex = Random().nextInt(_audioFiles.length);
-          } while (newIndex == _currentTrackIndex);
-          _currentTrackIndex = newIndex;
-        } else {
-          // Si solo hay una canción, simplemente la reproduce (o no hace nada si ya está sonando)
-          _currentTrackIndex = 0;
-        }
-      }
-      else {
+      if (_isShuffle && _audioFiles.length > 1) {
+        int newIndex;
+        do {
+          newIndex = Random().nextInt(_audioFiles.length);
+        } while (newIndex == _currentTrackIndex);
+        _currentTrackIndex = newIndex;
+      } else {
         _currentTrackIndex = (_currentTrackIndex - 1 + _audioFiles.length) % _audioFiles.length;
       }
     });
@@ -397,8 +422,14 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen> {
         }
       });
       if (_audioFiles.isNotEmpty) {
-        _play();
+        _preparePlayer();
       }
+    }
+  }
+
+  Future<void> _preparePlayer() async {
+    if (_audioFiles.isNotEmpty && _currentTrackIndex >= 0 && _currentTrackIndex < _audioFiles.length) {
+      await _audioPlayer.setSource(audioplayers.DeviceFileSource(_audioFiles[_currentTrackIndex].path));
     }
   }
 

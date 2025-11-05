@@ -15,7 +15,8 @@ class FavoritePlaylistsScreen extends StatefulWidget {
   });
 
   @override
-  State<FavoritePlaylistsScreen> createState() => _FavoritePlaylistsScreenState();
+  State<FavoritePlaylistsScreen> createState() =>
+      _FavoritePlaylistsScreenState();
 }
 
 class _FavoritePlaylistsScreenState extends State<FavoritePlaylistsScreen> {
@@ -53,20 +54,23 @@ class _FavoritePlaylistsScreenState extends State<FavoritePlaylistsScreen> {
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: const Text('Create New Playlist'),
+          title: const Text('Creae Nueva Lista'),
           content: TextField(
             controller: _playlistNameController,
-            decoration: const InputDecoration(hintText: "Playlist Name"),
+            decoration: const InputDecoration(hintText: "Nombre Lista"),
           ),
           actions: <Widget>[
             TextButton(
-              child: const Text('Cancel', style: TextStyle(color: Colors.red)),
+              child: const Text(
+                'Cancelar',
+                style: TextStyle(color: Colors.red),
+              ),
               onPressed: () {
                 Navigator.of(context).pop();
               },
             ),
             TextButton(
-              child: const Text('Create', style: TextStyle(color: Colors.red)),
+              child: const Text('Crear', style: TextStyle(color: Colors.red)),
               onPressed: () {
                 final String name = _playlistNameController.text;
                 if (name.isNotEmpty && !_playlists.containsKey(name)) {
@@ -100,7 +104,9 @@ class _FavoritePlaylistsScreenState extends State<FavoritePlaylistsScreen> {
 
   void _playPlaylist(String playlistName) {
     final List<String> songPaths = _playlists[playlistName]!;
-    final List<File> playlistFiles = songPaths.map((path) => File(path)).toList();
+    final List<File> playlistFiles = songPaths
+        .map((path) => File(path))
+        .toList();
     widget.onPlaylistSelected(playlistFiles);
     Navigator.of(context).pop();
   }
@@ -110,17 +116,23 @@ class _FavoritePlaylistsScreenState extends State<FavoritePlaylistsScreen> {
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: const Text('Delete Playlist'),
-          content: Text('Are you sure you want to delete the playlist "$playlistName"?'),
+          title: const Text('Eliminar Lista'),
+          content: Text('Esta seguro de eliminar la lista"$playlistName"?'),
           actions: <Widget>[
             TextButton(
-              child: const Text('Cancel'),
+              child: const Text(
+                'Cancelar',
+                style: TextStyle(color: Colors.red),
+              ),
               onPressed: () {
                 Navigator.of(context).pop();
               },
             ),
             TextButton(
-              child: const Text('Delete', style: TextStyle(color: Colors.red)),
+              child: const Text(
+                'Eliminar',
+                style: TextStyle(color: Colors.red),
+              ),
               onPressed: () {
                 _deletePlaylist(playlistName);
                 Navigator.of(context).pop();
@@ -143,14 +155,14 @@ class _FavoritePlaylistsScreenState extends State<FavoritePlaylistsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Favorite Playlists'),
+        title: const Text('Listas Favoritas'),
         backgroundColor: Colors.black,
       ),
       backgroundColor: Colors.black,
       body: _playlists.isEmpty
           ? const Center(
               child: Text(
-                'No playlists yet. Create one!',
+                'No hay listas. Crea una nueva!',
                 style: TextStyle(color: Colors.white),
               ),
             )
@@ -163,11 +175,15 @@ class _FavoritePlaylistsScreenState extends State<FavoritePlaylistsScreen> {
                     icon: const Icon(Icons.play_arrow, color: Colors.green),
                     onPressed: () => _playPlaylist(playlistName),
                   ),
-                  title: Text(playlistName, style: const TextStyle(color: Colors.white)),
+                  title: Text(
+                    playlistName,
+                    style: const TextStyle(color: Colors.white),
+                  ),
                   onTap: () => _openPlaylistDetail(playlistName),
                   trailing: IconButton(
                     icon: const Icon(Icons.delete, color: Colors.red),
-                    onPressed: () => _showDeleteConfirmationDialog(playlistName),
+                    onPressed: () =>
+                        _showDeleteConfirmationDialog(playlistName),
                   ),
                 );
               },
